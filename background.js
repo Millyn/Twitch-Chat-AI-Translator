@@ -192,7 +192,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
   if (message?.type === "ASR_TEXT") {
-    // Keep the MV3 service worker alive until this room's current translation
+    // Keep the MV3 service worker alive until this room''s current translation
     // drain finishes. Fire-and-forget fetches may be terminated when Chrome
     // suspends the worker, which previously produced intermittent missing subtitles.
     handleAsrText(message.text, message.tabId, message.sessionId, message.metrics)
@@ -333,12 +333,37 @@ function updatePageContext(tabId, channel, category) {
   }
 }
 
+
+/**
+ * 检测语音识别返回的垃圾文本，避免无意义内容发送到翻译 API。
+ * Whisper 在检测不到有效语音时常返回 "[?..." 等幻觉片段。
+ */
+function isGarbageAsrText(raw) {
+  if (!raw || typeof raw !== "string") return true;
+  const t = raw.trim();
+  if (!t) return true;
+  // 纯标点/特殊符号且极短
+  if (t.length <= 4 && !/[a-zA-Z0-9]/.test(t)) return true;
+  // Whisper 幻觉前缀 "[?" — 检测不到语音时的标准输出
+  if (/^\[\?/.test(t)) return true;
+  // 以 "[" 开头 + 非字母字符（如 "[ *", "[ ..."）
+  if (/^\[[^a-zA-Z]/.test(t)) return true;
+  // 纯问号或省略号
+  if (/^[?.\u2026]+$/.test(t)) return true;
+  return false;
+}
+
 async function handleAsrText(text, tabId, sessionId, metrics = {}) {
   await restorePromise;
   const session = sessions.get(tabId);
   if (!session || session.sessionId !== sessionId) return;
   const clean = String(text || "").trim();
   if (!clean) return;
+  // 过滤 Whisper 垃圾文本，不发送到翻译 API
+  if (isGarbageAsrText(clean)) {
+    console.log("[TCAT] ASR 垃圾文本已跳过:", JSON.stringify(clean));
+    return;
+  }
   const now = Date.now();
   if (clean === session.lastAsrText && now - (session.lastAsrAt || 0) < 15000) return;
   session.lastAsrText = clean;
@@ -548,3 +573,4 @@ function readableError(error) {
   if (text.includes("Extension has not been invoked") || text.includes("activeTab permission")) return "请切换到该 Twitch 页面，手动点击 Chrome 工具栏中的插件图标后再开启字幕";
   return text;
 }
+

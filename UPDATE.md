@@ -1,4 +1,15 @@
-﻿# 当前版本 1.1.0
+# 当前版本 1.2.0
+
+# 1.2 版本
+1. [bug] 在直播间语音流获取到翻译时有时会出现获取到`[?...` 的情况，首先我们要避免这种情况，其次，如果有这种情况那么就不要向 API 发出请求，直接 PASS 掉这个语音。✅ 已完成
+
+# 1.2 版本完成内容
+- background.js: 新增 isGarbageAsrText() 垃圾文本检测函数，过滤 Whisper 幻觉片段
+- background.js: handleAsrText() 入口处增加垃圾文本过滤，命中后直接跳过不发送翻译请求
+- background.js: 垃圾文本跳过时输出 console.log 日志便于排查
+- manifest.json: 版本号更新为 1.2.0
+
+完成时间：2026-08-20
 
 # 1.1 版本更新目的
 
@@ -85,4 +96,3 @@
 - debug.css: 调试页面样式
 - background.js: 实现调试数据收集和发送
 - manifest.json: 添加 contextMenus 权限和快捷键配置（Ctrl+Shift+D）
-
