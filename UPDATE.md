@@ -1,9 +1,27 @@
-# 当前版本 1.0.0
+﻿# 当前版本 1.1.0
+
+# 1.1 版本更新目的
+
+1. [bug] 关于直播间的翻译，我有要求向 Deepseek 翻译英文时提供当前游戏分区，作为更专业化的翻译结果，但这个功能似乎没有正常实现，需要检查。✅ 已完成
+2. [opt] 优化DEBUG页面的显示，首先 DEBUG 页面应该是列表，是每一个请求就出现一列，这一列里要包含本地模型采集到的原始音频，向 DEEPSEEK API 发送的请求体内容，以及 DEEPSEEK 返回的结果，现在这种 DEBUG 页面太乱了，根本排查不了问题。在向 API 请求时，有 2 种，一种是直播间语音原文，我们定义为 Streaming，一种是直播间CHAT文字，我们定义为 Chat，作为区分。✅ 已完成
+
+完成时间：2026-08-20
+
+# 1.1 版本完成内容
+- content.js: readCategory() 增加 10+ 个备用选择器（data-testid、data-test-selector、ARIA、meta 标签等），支持 /directory/game/ 链接，增加防御性检查和调试日志。
+- background.js: translateMessage() 签名增加 requestId 参数，所有 sendDebugMessage 调用传入 requestId，翻译成功时调用 finishDebugRequest。
+- background.js: 新增 createRequestId()、createDebugRequest()、updateDebugRequest()、finishDebugRequest() 等函数，实现按请求聚合的调试数据结构。
+- background.js: normalizeCategory() 增强防御空值、对象、数组等异常输入。
+- debug.js: 支持 DEBUG_REQUEST 消息类型，按 request.id 更新或插入记录。
+- debug.html: 表格列更新为时间、类型、原文、状态、耗时、操作。
+- debug.js: Streaming/Chat 徽章分别使用蓝色/绿色，点击行展开查看详情。
+- debug.css: 增加展开/收起动画及键盘操作支持。
+- manifest.json: 版本号更新为 1.1.0。
 
 # 1.0 版本更新目的
 
 1. [bug] 现在对直播间的字幕识别有问题，主播讲话经常识别不到语音内容。✅ 已完成
-2. [opz] 我看的大多都是英文直播间，优化可选的本地语音模型，建议通过 API 可获取模型列表，然后直接下载到本地。✅ 已完成
+2. [opt] 我看的大多都是英文直播间，优化可选的本地语音模型，建议通过 API 可获取模型列表，然后直接下载到本地。✅ 已完成
 3. [bug] Chrome 插件提示有 Error "assets/ort-wasm-simd-threaded.jsep.mjs:100 (Bc)" ✅ 已完成
 
 完成时间：2026-08-20
@@ -67,3 +85,4 @@
 - debug.css: 调试页面样式
 - background.js: 实现调试数据收集和发送
 - manifest.json: 添加 contextMenus 权限和快捷键配置（Ctrl+Shift+D）
+

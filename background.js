@@ -9,19 +9,124 @@ const MAX_VOICE_SESSIONS = 2;
 const MAX_DEBUG_RECORDS = 50;
 const sessions = new Map();
 const pageContexts = new Map();
-const debugLogs = { audio: [], api: [], prompt: [], category: [], timing: [], token: [] };
+const debugRequests = [];
 const restorePromise = restoreSessions();
 
 /**
- * 发送调试信息到 debug 页面，同时缓存到内存供 GET_DEBUG_STATE 查询
+ * 创建一条以翻译请求为中心的调试记录。
+ * DEBUG 页面只展示请求记录，不再为每一种 DEBUG 事件单独创建一行。
  */
-function sendDebugMessage(type, data) {
-  const section = { DEBUG_AUDIO: "audio", DEBUG_API_REQUEST: "api", DEBUG_API_RESPONSE: "api", DEBUG_PROMPT: "prompt", DEBUG_CATEGORY: "category", DEBUG_TIMING: "timing", DEBUG_TOKEN_USAGE: "token" }[type];
-  if (section) {
-    debugLogs[section].unshift({ timestamp: Date.now(), data, type: "info" });
-    if (debugLogs[section].length > MAX_DEBUG_RECORDS) debugLogs[section].pop();
+function createRequestId() {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
-  chrome.runtime.sendMessage({ type, data }).catch(() => {});
+}
+
+function findDebugRequest(requestId) {
+  return debugRequests.find((request) => request.id === requestId);
+}
+
+function broadcastDebugRequest(request) {
+  chrome.runtime.sendMessage({
+    type: "DEBUG_REQUEST",
+    requestId: request.id,
+    data: request,
+  }).catch(() => {});
+}
+
+function createDebugRequest(type, original, requestId = createRequestId()) {
+  const existing = findDebugRequest(requestId);
+  if (existing) return requestId;
+
+  const request = {
+    id: requestId,
+    type: type === "voice" || type === "streaming" ? "streaming" : "chat",
+    timestamp: Date.now(),
+    original: String(original ?? ""),
+    apiRequest: null,
+    apiResponse: null,
+    status: "pending",
+    duration: null,
+    prompt: null,
+    category: null,
+    tokenUsage: null,
+    error: null,
+  };
+  debugRequests.unshift(request);
+  if (debugRequests.length > MAX_DEBUG_RECORDS) debugRequests.pop();
+  broadcastDebugRequest(request);
+  return requestId;
+}
+
+function updateDebugRequest(requestId, type, data) {
+  const request = findDebugRequest(requestId);
+  if (!request) return;
+
+  switch (type) {
+    case "DEBUG_AUDIO": {
+      request.audio = data;
+      const original = data?.original || data?.text || data?.asrText;
+      if (original && !request.original) request.original = String(original);
+      if (data?.status === "error") {
+        request.status = "error";
+        request.error = data.detail || "音频采集失败";
+      }
+      break;
+    }
+    case "DEBUG_API_REQUEST":
+      request.apiRequest = data?.body ?? data;
+      request.apiRequestMeta = { url: data?.url || "", method: data?.method || "" };
+      break;
+    case "DEBUG_API_RESPONSE":
+      request.apiResponse = data;
+      if (data?.elapsedMs != null) request.duration = Number(data.elapsedMs);
+      if (data?.ok === false) {
+        request.status = "error";
+        request.error = data.error || data.data?.error?.message || `HTTP ${data.status || "Error"}`;
+      } else if (data?.ok === true) {
+        request.status = "success";
+      }
+      break;
+    case "DEBUG_PROMPT":
+      request.prompt = data;
+      break;
+    case "DEBUG_CATEGORY":
+      request.category = data;
+      break;
+    case "DEBUG_TIMING":
+      if (data?.elapsedMs != null) request.duration = Number(data.elapsedMs);
+      break;
+    case "DEBUG_TOKEN_USAGE":
+      request.tokenUsage = data;
+      break;
+    case "DEBUG_LOG":
+      request.logs = [...(request.logs || []), data].slice(-20);
+      break;
+    default:
+      break;
+  }
+}
+
+/**
+ * 发送调试事件到 debug 页面，并把事件合并到对应请求。
+ */
+function sendDebugMessage(type, data, requestId) {
+  if (requestId) updateDebugRequest(requestId, type, data);
+  const outboundData = requestId && data && typeof data === "object"
+    ? { ...data, requestId }
+    : data;
+  chrome.runtime.sendMessage({ type, requestId, data: outboundData }).catch(() => {});
+}
+
+function finishDebugRequest(requestId, status, patch = {}) {
+  const request = findDebugRequest(requestId);
+  if (!request) return;
+  request.status = status;
+  Object.assign(request, patch);
+  if (request.duration == null) request.duration = Math.max(0, Date.now() - request.timestamp);
+  broadcastDebugRequest(request);
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -38,7 +143,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const tabId = sender.tab?.id ?? message?.tabId;
   if (message?.type === "PAGE_CONTEXT") {
-    restorePromise.then(() => updatePageContext(tabId, message.channel, message.category));
+    console.log("[TCAT] PAGE_CONTEXT: 收到 category", {
+      tabId,
+      channel: message.channel,
+      category: message.category,
+    });
+    restorePromise
+      .then(() => updatePageContext(tabId, message.channel, message.category))
+      .catch((error) => console.warn("[TCAT] PAGE_CONTEXT 处理失败", error?.message || error));
     return false;
   }
   if (message?.type === "VOICE_HEARTBEAT") {
@@ -76,7 +188,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
   if (message?.type === "GET_DEBUG_STATE") {
-    sendResponse({ data: debugLogs });
+    sendResponse({ data: debugRequests });
     return false;
   }
   if (message?.type === "ASR_TEXT") {
@@ -89,10 +201,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message?.type !== "TRANSLATE") return false;
-  const category = pageContexts.get(tabId)?.category || normalizeCategory(message.category);
-  translateMessage(message.text, message.targetLanguage, message.context || "chat", category)
+  const storedCategory = normalizeCategory(pageContexts.get(tabId)?.category);
+  const messageCategory = normalizeCategory(message.category);
+  const category = storedCategory || messageCategory;
+  console.log("[TCAT] TRANSLATE: 使用 category", { tabId, storedCategory, messageCategory, category });
+  const requestId = createDebugRequest("chat", message.text);
+  translateMessage(message.text, message.targetLanguage, message.context || "chat", category, requestId)
     .then((translation) => sendResponse({ ok: true, translation }))
-    .catch((error) => sendResponse({ ok: false, error: readableError(error) }));
+    .catch((error) => {
+      finishDebugRequest(requestId, "error", { error: readableError(error) });
+      sendResponse({ ok: false, error: readableError(error) });
+    });
   return true;
 });
 
@@ -189,10 +308,20 @@ async function handleVoiceStatus(message) {
 }
 
 function updatePageContext(tabId, channel, category) {
-  if (!Number.isInteger(tabId)) return;
+  if (!Number.isInteger(tabId) || tabId < 0) {
+    console.warn("[TCAT] updatePageContext: 无效 tabId", tabId);
+    return;
+  }
   const next = { channel: String(channel || ""), category: normalizeCategory(category) };
   const previous = pageContexts.get(tabId);
+  console.log("[TCAT] updatePageContext: 接收 category", {
+    tabId,
+    channel: next.channel,
+    category: next.category,
+    previousCategory: previous?.category || "",
+  });
   pageContexts.set(tabId, next);
+  console.log("[TCAT] updatePageContext: pageContexts 已存储", { tabId, ...next });
   const session = sessions.get(tabId);
   if (session && previous?.channel && next.channel && previous.channel !== next.channel) {
     stopVoice(tabId, "检测到直播频道已切换，请在新页面重新开启字幕");
@@ -214,9 +343,24 @@ async function handleAsrText(text, tabId, sessionId, metrics = {}) {
   if (clean === session.lastAsrText && now - (session.lastAsrAt || 0) < 15000) return;
   session.lastAsrText = clean;
   session.lastAsrAt = now;
+  const requestId = createDebugRequest("streaming", clean);
+  sendDebugMessage("DEBUG_AUDIO", {
+    tabId,
+    sessionId,
+    original: clean,
+    text: clean,
+    metrics,
+    channel: session.channel,
+    category: session.category,
+  }, requestId);
   // Keep only the newest waiting utterance. DeepSeek requests must not build an
   // unbounded per-room backlog when recognition is faster than the network.
-  session.pendingAsrText = { text: clean, metrics };
+  if (session.pendingAsrText?.requestId) {
+    finishDebugRequest(session.pendingAsrText.requestId, "error", {
+      error: "识别到更新语句，已跳过旧请求",
+    });
+  }
+  session.pendingAsrText = { text: clean, metrics, requestId };
   return drainTranslationQueue(tabId, sessionId);
 }
 
@@ -235,7 +379,7 @@ async function drainTranslationQueue(tabId, sessionId) {
       notifyTab(tabId, { type: "SUBTITLE", sessionId, original: clean, translation: "翻译中…", diagnostics: pending.metrics });
       try {
         const translationStartedAt = performance.now();
-        const translation = await translateMessage(clean, null, "voice", pageContexts.get(tabId)?.category || session.category);
+        const translation = await translateMessage(clean, null, "voice", pageContexts.get(tabId)?.category || session.category, pending.requestId);
         const diagnostics = { ...pending.metrics, translationMs: Math.round(performance.now() - translationStartedAt) };
         const current = sessions.get(tabId);
         if (!current || current.sessionId !== sessionId) return;
@@ -257,12 +401,13 @@ async function drainTranslationQueue(tabId, sessionId) {
   }
 }
 
-async function translateMessage(text, requestedLanguage, context, category) {
+async function translateMessage(text, requestedLanguage, context, category, requestId) {
   const settings = await chrome.storage.local.get(DEFAULT_SETTINGS);
   const apiKey = String(settings.apiKey || "").trim();
   if (!apiKey) throw new Error("请先在插件设置中填写 DeepSeek API Key");
   if (!text || typeof text !== "string") throw new Error("没有可翻译的文字");
   const normalizedCategory = normalizeCategory(category);
+  console.log("[TCAT] translateMessage: 使用 category", { context, category: normalizedCategory });
   const categoryLine = `当前 Twitch 直播分区：${normalizedCategory || "未知分区"}。仅将分区作为用词语境，不推测主播当前操作。`;
   const targetLanguage = requestedLanguage || settings.targetLanguage;
   let instruction;
@@ -275,8 +420,8 @@ async function translateMessage(text, requestedLanguage, context, category) {
   }
 
   // 调试：发送 PROMPT 内容和直播分类
-  sendDebugMessage("DEBUG_PROMPT", { instruction, context, targetLanguage });
-  sendDebugMessage("DEBUG_CATEGORY", { category: normalizedCategory, context });
+  sendDebugMessage("DEBUG_PROMPT", { instruction, context, targetLanguage, category: normalizedCategory }, requestId);
+  sendDebugMessage("DEBUG_CATEGORY", { category: normalizedCategory, context }, requestId);
 
   const requestBody = { model: "deepseek-chat", messages: [{ role: "system", content: instruction }, { role: "user", content: text.slice(0, 2000) }], temperature: 0.2, max_tokens: 500, stream: false };
   // 调试：发送 API 请求信息（隐藏 API Key）
@@ -284,7 +429,7 @@ async function translateMessage(text, requestedLanguage, context, category) {
     url: "https://api.deepseek.com/chat/completions",
     method: "POST",
     body: requestBody,
-  });
+  }, requestId);
 
   const requestStartedAt = performance.now();
   const controller = new AbortController();
@@ -320,14 +465,14 @@ async function translateMessage(text, requestedLanguage, context, category) {
     status: response.status,
     data: data,
     elapsedMs,
-  });
+  }, requestId);
 
   // 调试：发送翻译耗时
   sendDebugMessage("DEBUG_TIMING", {
     elapsedMs,
     context,
     textLength: text.length,
-  });
+  }, requestId);
 
   // 调试：发送 TOKEN 用量（如果 API 返回）
   if (data?.usage) {
@@ -336,12 +481,13 @@ async function translateMessage(text, requestedLanguage, context, category) {
       completion_tokens: data.usage.completion_tokens,
       total_tokens: data.usage.total_tokens,
       model: data.model,
-    });
+    }, requestId);
   }
 
   if (!response.ok) throw new Error(`DeepSeek 请求失败：${data?.error?.message || `HTTP ${response.status}`}`);
   const translation = data?.choices?.[0]?.message?.content?.trim();
   if (!translation) throw new Error("DeepSeek 没有返回译文");
+  finishDebugRequest(requestId, "success", { translation });
   return translation;
 }
 
@@ -384,7 +530,16 @@ async function restoreSessions() {
   }
   await persistSessions();
 }
-function normalizeCategory(value) { return String(value || "").replace(/\s+/g, " ").trim().slice(0, 120); }
+function normalizeCategory(value) {
+  // 页面消息应该传递纯字符串；拒绝对象、数组和其他异常值，避免把
+  // "[object Object]" 等无意义内容拼进 DeepSeek prompt。
+  if (typeof value !== "string") return "";
+  try {
+    return value.replace(/\s+/g, " ").trim().slice(0, 120);
+  } catch {
+    return "";
+  }
+}
 function channelFromUrl(url) { try { return new URL(url).pathname.split("/").filter(Boolean)[0] || ""; } catch { return ""; } }
 function isTwitchChannelUrl(url) { const channel = channelFromUrl(url); return String(url).startsWith("https://www.twitch.tv/") && channel && !new Set(["directory", "downloads", "jobs", "p", "search", "settings", "subscriptions", "videos", "wallet"]).has(channel.toLowerCase()); }
 function readableError(error) {

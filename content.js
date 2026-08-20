@@ -270,20 +270,151 @@
   function refreshPageContext(force = false) {
     const channel = channelFromPath();
     const category = readCategory();
-    if (!force && channel === pageContext.channel && category === pageContext.category) return;
+    const previous = pageContext;
+    if (!force && channel === previous.channel && category === previous.category) {
+      console.log("[TCAT] refreshPageContext: 页面上下文未变化", { channel, category });
+      return;
+    }
     pageContext = { channel, category };
-    chrome.runtime.sendMessage({ type: "PAGE_CONTEXT", channel, category }).catch(() => {});
+    console.log("[TCAT] refreshPageContext: 发送 PAGE_CONTEXT", { channel, category, force });
+    chrome.runtime.sendMessage({ type: "PAGE_CONTEXT", channel, category }).catch((error) => {
+      console.warn("[TCAT] refreshPageContext: PAGE_CONTEXT 发送失败", error?.message || error);
+    });
   }
 
   function readCategory() {
-    const selectors = ['[data-a-target="stream-game-link"]', '[data-a-target="game-link"]', 'a[href*="/directory/category/"]'];
-    for (const selector of selectors) {
-      for (const node of document.querySelectorAll(selector)) {
-        const text = normalize(node.textContent || node.getAttribute("aria-label") || "");
-        if (text && text.length <= 120) return text;
+    // Twitch 会随页面布局实验调整 data-* 属性；优先使用专用节点，再尝试
+    // data-testid / data-test-selector 和目录链接等较稳定的语义线索。
+    const selectors = [
+      ['[data-a-target="stream-game-link"]', "data-a-target:stream-game-link"],
+      ['[data-test-selector="stream-game-link"]', "data-test-selector:stream-game-link"],
+      ['[data-testid="stream-game-link"]', "data-testid:stream-game-link"],
+      ['[data-a-target="game-link"]', "data-a-target:game-link"],
+      ['[data-test-selector="game-link"]', "data-test-selector:game-link"],
+      ['[data-testid="game-link"]', "data-testid:game-link"],
+      ['[data-a-target="stream-info-game"]', "data-a-target:stream-info-game"],
+      ['[data-test-selector="stream-info-game"]', "data-test-selector:stream-info-game"],
+      ['[data-testid="stream-info-game"]', "data-testid:stream-info-game"],
+      ['[data-a-target="stream-game-name"]', "data-a-target:stream-game-name"],
+      ['[data-test-selector="stream-game-name"]', "data-test-selector:stream-game-name"],
+      ['[data-testid="stream-game-name"]', "data-testid:stream-game-name"],
+      ['[data-a-target*="game-name"]', "data-a-target:*game-name"],
+      ['[data-test-selector*="game-name"]', "data-test-selector:*game-name"],
+      ['[data-testid*="game-name"]', "data-testid:*game-name"],
+      ['[data-a-target*="category-name"]', "data-a-target:*category-name"],
+      ['[data-test-selector*="category-name"]', "data-test-selector:*category-name"],
+      ['[data-testid*="category-name"]', "data-testid:*category-name"],
+      ['[data-game-name]', "data-game-name"],
+      ['[data-category]', "data-category"],
+      ['[data-a-target*="game-link"]', "data-a-target:*game-link"],
+      ['[data-test-selector*="game-link"]', "data-test-selector:*game-link"],
+      ['[data-testid*="game-link"]', "data-testid:*game-link"],
+      ['[data-a-target*="category"]', "data-a-target:*category"],
+      ['[data-test-selector*="category"]', "data-test-selector:*category"],
+      ['[data-testid*="category"]', "data-testid:*category"],
+      ['a[href*="/directory/category/"]', "directory-category-link"],
+      ['a[href*="/directory/game/"]', "directory-game-link"],
+    ];
+
+    for (const [selector, source] of selectors) {
+      for (const node of queryCategoryNodes(selector)) {
+        const category = categoryFromNode(node);
+        if (category) {
+          console.log("[TCAT] readCategory: 返回值", { category, source });
+          return category;
+        }
       }
     }
+
+    // 有些版本只在无障碍标签中暴露游戏名，且不再保留 stream-game-link。
+    for (const node of queryCategoryNodes("[aria-label]")) {
+      const label = node.getAttribute("aria-label") || "";
+      if (!/^(?:game|category|游戏|分区)\s*[:：-]/i.test(label.trim())) continue;
+      const category = cleanCategoryCandidate(label);
+      if (category) {
+        console.log("[TCAT] readCategory: 返回值", { category, source: "aria-label" });
+        return category;
+      }
+    }
+
+    // DOM 节点尚未挂载或布局变体没有可用链接时，读取明确表示游戏/分区的
+    // meta 标签。不要使用 og:title 等泛化字段，避免把直播标题误当成分区。
+    const metaSelectors = [
+      'meta[name="game"]',
+      'meta[name="category"]',
+      'meta[property="game"]',
+      'meta[property="category"]',
+      'meta[property="og:video:game"]',
+      'meta[property="og:video:category"]',
+      'meta[name="twitter:game"]',
+      'meta[name="twitter:category"]',
+      'meta[itemprop="game"]',
+      'meta[itemprop="category"]',
+    ];
+    for (const selector of metaSelectors) {
+      for (const node of queryCategoryNodes(selector)) {
+        const category = cleanCategoryCandidate(node.getAttribute("content") || "");
+        if (category) {
+          console.log("[TCAT] readCategory: 返回值", { category, source: selector });
+          return category;
+        }
+      }
+    }
+
+    console.log("[TCAT] readCategory: 返回值", { category: "", source: "none" });
     return "";
+  }
+
+  function queryCategoryNodes(selector) {
+    try {
+      return document.querySelectorAll(selector);
+    } catch (error) {
+      console.warn("[TCAT] readCategory: 选择器查询失败", { selector, error: error?.message || error });
+      return [];
+    }
+  }
+
+  function categoryFromNode(node) {
+    if (!node || node.nodeType !== 1) return "";
+
+    // 目录链接是最可靠的来源；即使 Twitch 把链接文本改成图标，也可以从
+    // /directory/category/<slug> 或 /directory/game/<slug> 中恢复可读名称。
+    const fromHref = categoryFromHref(node.getAttribute("href"));
+    if (fromHref) return fromHref;
+
+    const values = [
+      node.getAttribute("data-game-name"),
+      node.getAttribute("data-category"),
+      node.getAttribute("data-game"),
+      node.textContent,
+      node.getAttribute("aria-label"),
+      node.getAttribute("title"),
+    ];
+    for (const value of values) {
+      const category = cleanCategoryCandidate(value);
+      if (category) return category;
+    }
+    return "";
+  }
+
+  function categoryFromHref(href) {
+    if (!href || typeof href !== "string") return "";
+    try {
+      const url = new URL(href, location.origin);
+      const match = url.pathname.match(/\/directory\/(?:category|game)\/([^/?#]+)/i);
+      if (!match) return "";
+      return cleanCategoryCandidate(decodeURIComponent(match[1]).replace(/[-_+]+/g, " "));
+    } catch {
+      return "";
+    }
+  }
+
+  function cleanCategoryCandidate(value) {
+    if (typeof value !== "string") return "";
+    const text = normalize(value)
+      .replace(/^(?:game|category|游戏|分区|直播分区|游戏分区)\s*[:：-]\s*/i, "")
+      .trim();
+    return text && text.length <= 120 ? text : "";
   }
 
   function channelFromPath() {
