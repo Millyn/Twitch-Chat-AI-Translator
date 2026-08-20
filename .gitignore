@@ -1,0 +1,14 @@
+config.json
+models/
+runtime/
+*.exe
+*.exe~
+*.part
+*.tmp
+.idea/
+go-portable.zip
+.cache/
+.mimocode
+.m-work-flow/
+.claude/
+.omo/

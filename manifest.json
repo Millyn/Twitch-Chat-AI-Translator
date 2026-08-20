@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Twitch Chat AI Translator",
+  "version": "1.0.0",
+  "description": "Translate Twitch chat and create local Whisper subtitles with DeepSeek.",
+  "minimum_chrome_version": "116",
+  "permissions": ["storage", "tabCapture", "offscreen", "activeTab", "contextMenus"],
+  "host_permissions": [
+    "https://www.twitch.tv/*",
+    "https://api.deepseek.com/*",
+    "https://huggingface.co/*",
+    "https://*.huggingface.co/*",
+    "https://*.hf.co/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Twitch Chat AI Translator",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "commands": {
+    "open-debug-page": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D",
+        "mac": "Command+Shift+D"
+      },
+      "description": "打开调试页面"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; worker-src 'self';"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.twitch.tv/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

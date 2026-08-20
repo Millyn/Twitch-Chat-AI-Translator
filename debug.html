@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Twitch Chat AI Translator - Debug</title>
+    <link rel="stylesheet" href="debug.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <header>
+        <span class="eyebrow">DEBUG MODE</span>
+        <h1>调试信息</h1>
+        <p>实时监控扩展运行状态和 API 请求详情。每行 = 一次完整翻译请求。</p>
+      </header>
+
+      <div class="table-wrap">
+        <table class="debug-table" id="debug-table">
+          <thead>
+            <tr>
+              <th class="col-time">时间</th>
+              <th class="col-type">类型</th>
+              <th class="col-status">状态</th>
+              <th class="col-summary">摘要</th>
+              <th class="col-duration">耗时</th>
+              <th class="col-detail">详情</th>
+            </tr>
+          </thead>
+          <tbody id="debug-tbody">
+            <tr class="empty-row"><td colspan="6"><div class="empty-state">等待数据...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="controls">
+        <button id="clear-all" class="secondary">清除所有记录</button>
+        <button id="export-logs">导出日志</button>
+        <span id="status" role="status"></span>
+      </div>
+
+      <aside>
+        <strong>访问方式：</strong>使用快捷键 <kbd>Ctrl+Shift+D</kbd> (Windows/Linux) 或 <kbd>Command+Shift+D</kbd> (Mac) 打开调试页面。
+        <br><br>
+        最近 50 条记录自动保留。点击"详情"可展开查看完整 JSON。
+      </aside>
+    </main>
+    <script src="debug.js"></script>
+  </body>
+</html>

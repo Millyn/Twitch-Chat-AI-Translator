@@ -1,0 +1,13 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="popup.css"></head>
+<body><main>
+  <div class="brand"><span>译</span><div><strong>Twitch Chat 翻译</strong><small id="state">正在读取状态…</small></div></div>
+  <label><span>悬停翻译</span><input id="enabled" type="checkbox"></label>
+  <label><span>自动翻译</span><input id="auto-translate" type="checkbox"></label>
+  <button id="current-voice">开启当前页面字幕</button>
+  <button id="subtitle-position" class="secondary">显示字幕框并调整位置</button>
+  <section id="sessions"><div class="empty">没有正在运行的语音字幕</div></section>
+  <button id="stop-all" hidden>停止全部字幕</button>
+  <button id="settings" class="secondary">设置模型与 API Key</button>
+  <button id="debug-panel" class="secondary">调试面板</button>
+  <p>每个直播间都需要先切换到该标签页，再手动点击 Chrome 工具栏中的插件图标开启。聊天框中按 Shift + Alt + Enter 可翻译并发送。</p>
+</main><script src="popup.js"></script></body></html>

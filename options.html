@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Twitch Chat AI Translator 设置</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <header>
+        <span class="eyebrow">TWITCH CHAT</span>
+        <h1>AI 翻译设置</h1>
+        <p>鼠标停留在 Twitch 聊天消息上，即可使用 DeepSeek 翻译。</p>
+      </header>
+
+      <section class="model-card">
+        <div class="section-heading">
+          <div><span class="eyebrow">LOCAL WHISPER</span><h2>本地语音模型</h2></div>
+          <span id="model-badge" class="badge">未配置</span>
+        </div>
+        <p>RTX 4070 推荐 Distil-Whisper Small English WebGPU 高质量版（约550MB）。模型直接保存到你选择的磁盘文件夹，不进入浏览器缓存。</p>
+        <div class="model-actions">
+          <button id="download-model" type="button">选择文件夹并自动下载</button>
+          <button id="select-model" type="button" class="secondary">使用已有模型文件夹</button>
+          <button id="refresh-model-catalog" type="button" class="secondary">刷新模型目录</button>
+        </div>
+        <small id="model-catalog-status" class="model-catalog-status" role="status" aria-live="polite"></small>
+        <label class="catalog-api-label">
+          <span>模型目录 API（可选）</span>
+          <input id="model-catalog-api-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://huggingface.co/api/models?..." />
+          <small>默认使用 Hugging Face 官方 API；可自定义 huggingface.co 或 hf.co 域名下的地址。接口需返回 JSON 数组并支持跨域请求，目录只接受可验证的 ONNX Whisper 模型。</small>
+        </label>
+        <div class="grid">
+          <label>
+            <span>语音识别模型</span>
+            <select id="voice-model" aria-describedby="model-catalog-status"></select>
+          </label>
+          <label>
+            <span>识别模式</span>
+            <select id="voice-mode">
+              <option value="fast">低延迟 · 约 2.5 秒</option>
+              <option value="balanced">均衡 · 约 3.5 秒</option>
+              <option value="accurate">高准确 · 约 5 秒</option>
+            </select>
+          </label>
+        </div>
+        <div id="model-progress" class="progress-wrap" hidden>
+          <div class="progress-track"><span id="progress-bar"></span></div>
+          <small id="progress-text"></small>
+        </div>
+        <small>也可以从 <a href="https://huggingface.co/onnx-community/distil-small.en_timestamped/tree/main" target="_blank">Hugging Face Distil Small English 模型页面</a>手动下载。</small>
+      </section>
+
+      <form id="settings-form">
+        <label class="toggle-row">
+          <span><strong>启用悬停翻译</strong><small>关闭后不会发送任何翻译请求</small></span>
+          <input id="enabled" type="checkbox" />
+        </label>
+
+        <label>
+          <span>DeepSeek API Key</span>
+          <div class="secret-row">
+            <input id="api-key" type="password" autocomplete="off" placeholder="sk-..." />
+            <button id="toggle-key" type="button" class="secondary">显示</button>
+          </div>
+          <small>密钥仅保存在本机 Chrome 扩展存储中，不会写入页面。</small>
+        </label>
+
+        <div class="grid">
+          <label>
+            <span>目标语言</span>
+            <select id="target-language">
+              <option value="简体中文">简体中文</option>
+              <option value="繁体中文">繁体中文</option>
+              <option value="English">English</option>
+              <option value="日本語">日本語</option>
+              <option value="한국어">한국어</option>
+            </select>
+          </label>
+          <label>
+            <span>悬停触发时间</span>
+            <select id="hover-delay">
+              <option value="200">快速 · 200ms</option>
+              <option value="350">默认 · 350ms</option>
+              <option value="600">稳妥 · 600ms</option>
+              <option value="1000">节省请求 · 1秒</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid">
+          <label>
+            <span>字幕字号</span>
+            <select id="subtitle-size">
+              <option value="18">较小</option>
+              <option value="22">默认</option>
+              <option value="27">较大</option>
+              <option value="32">超大</option>
+            </select>
+          </label>
+          <label>
+            <span>字幕背景</span>
+            <select id="subtitle-opacity">
+              <option value="0.55">浅色</option>
+              <option value="0.75">适中</option>
+              <option value="0.9">深色</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="toggle-row">
+          <span><strong>字幕诊断模式</strong><small>显示音频、排队、识别和翻译耗时。</small></span>
+          <input id="voice-diagnostics" type="checkbox" />
+        </label>
+
+        <div class="actions">
+          <button type="submit">保存设置</button>
+          <button id="test-api" type="button" class="secondary">测试 API</button>
+          <span id="status" role="status"></span>
+        </div>
+      </form>
+
+      <aside>
+        翻译结果只缓存在当前 Twitch 页面内存中。刷新、关闭页面或切换直播间后自动清除。
+      </aside>
+    </main>
+    <script src="model-store.js"></script>
+    <script src="options.js"></script>
+  </body>
+</html>

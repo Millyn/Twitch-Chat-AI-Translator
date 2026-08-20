@@ -1,0 +1,281 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: #0e0e10;
+  color: #efeff1;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; padding: 48px 20px; background: radial-gradient(circle at top, #24123f, #0e0e10 42%); }
+.panel { width: min(1100px, 100%); margin: auto; padding: 32px; border: 1px solid #34343b; border-radius: 18px; background: #18181b; box-shadow: 0 24px 80px #0008; }
+header { margin-bottom: 28px; }
+.eyebrow { color: #bf94ff; font-size: 12px; font-weight: 800; letter-spacing: .16em; }
+h1 { margin: 6px 0 8px; font-size: 30px; }
+p, small { color: #adadb8; }
+a { color: #bf94ff; }
+
+/* 表格容器 */
+.table-wrap {
+  overflow-x: auto;
+  margin-bottom: 24px;
+  border: 1px solid #34343b;
+  border-radius: 12px;
+  background: #1a1a1f;
+}
+
+/* 表格 */
+.debug-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.debug-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.debug-table th {
+  padding: 12px 14px;
+  background: #1f1f25;
+  color: #bf94ff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: left;
+  border-bottom: 2px solid #34343b;
+  white-space: nowrap;
+}
+
+.debug-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #2a2a2f;
+  vertical-align: top;
+  color: #d4d4d8;
+}
+
+.debug-table tbody tr:hover {
+  background: #1f1f28;
+}
+
+.debug-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 列宽 */
+.col-time { width: 85px; }
+.col-type { width: 90px; }
+.col-status { width: 70px; }
+.col-summary { min-width: 200px; }
+.col-duration { width: 70px; text-align: right; }
+.col-detail { width: 60px; text-align: center; }
+
+/* 时间列 */
+.cell-time {
+  color: #bf94ff;
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 类型徽章 */
+.type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.badge-audio { background: #2a2a3f; color: #9147ff; }
+.badge-chat { background: #1a2a2a; color: #71eeb1; }
+.badge-voice { background: #2a2a1a; color: #bf94ff; }
+.badge-request { background: #1a1a2a; color: #6ba3ff; }
+.badge-response { background: #1a2a1a; color: #71eeb1; }
+.badge-error { background: #2a1a1a; color: #ff8280; }
+.badge-prompt { background: #2a2a2a; color: #adadb8; }
+.badge-category { background: #2a2a2a; color: #adadb8; }
+.badge-timing { background: #2a2a2a; color: #adadb8; }
+.badge-token { background: #2a2a2a; color: #adadb8; }
+.badge-info { background: #2a2a3f; color: #9147ff; }
+.badge-success { background: #1a2a1a; color: #71eeb1; }
+
+/* 状态 */
+.cell-status {
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 12px;
+}
+
+.status-ok { color: #71eeb1; }
+.status-error { color: #ff8280; }
+.status-pending { color: #adadb8; }
+
+/* 摘要 */
+.cell-summary {
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.summary-text {
+  color: #d4d4d8;
+}
+
+.summary-detail {
+  color: #6b6b76;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* 耗时 */
+.cell-duration {
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 详情按钮 */
+.btn-detail {
+  padding: 3px 8px;
+  border: 1px solid #34343b;
+  border-radius: 4px;
+  background: transparent;
+  color: #bf94ff;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-detail:hover {
+  background: #2a2a3f;
+  border-color: #52368a;
+}
+
+/* 详情展开行 */
+.detail-row td {
+  padding: 0 !important;
+  border-bottom: 2px solid #34343b !important;
+  background: #151518;
+}
+
+.detail-content {
+  padding: 14px 18px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* JSON 展示 */
+.json-block {
+  margin: 0;
+  padding: 12px;
+  background: #121215;
+  border: 1px solid #2a2a2f;
+  border-radius: 6px;
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #d4d4d8;
+}
+
+/* JSON 语法高亮 */
+.tok-key { color: #9147ff; }
+.tok-string { color: #71eeb1; }
+.tok-number { color: #ff8280; }
+.tok-boolean { color: #bf94ff; }
+.tok-null { color: #6b6b76; font-style: italic; }
+.tok-punct { color: #d4d4d8; }
+.tok-value { color: #efeff1; }
+
+/* 空状态 */
+.empty-state {
+  color: #6b6b76;
+  font-style: italic;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.empty-row td {
+  background: transparent !important;
+}
+
+/* 控制按钮 */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 16px 0;
+  border-top: 1px solid #34343b;
+}
+
+button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid #9147ff;
+  border-radius: 8px;
+  background: #9147ff;
+  color: white;
+  font-weight: 750;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #772ce8;
+}
+
+button.secondary {
+  border-color: #464649;
+  background: #2f2f35;
+}
+
+button.secondary:hover {
+  background: #3f3f46;
+}
+
+#status {
+  color: #bf94ff;
+  font-size: 14px;
+}
+
+#status.error {
+  color: #ff8280;
+}
+
+aside {
+  margin-top: 24px;
+  padding: 14px 16px;
+  border-radius: 9px;
+  background: #242428;
+  color: #adadb8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 12px;
+  color: #efeff1;
+  background: #34343b;
+  border: 1px solid #52368a;
+  border-radius: 4px;
+  box-shadow: 0 1px 0 #52368a;
+}
+
+@media (max-width: 700px) {
+  .panel { padding: 16px; }
+  .debug-table { font-size: 12px; }
+  .debug-table th, .debug-table td { padding: 8px 10px; }
+  .col-duration { display: none; }
+}
